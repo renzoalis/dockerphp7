@@ -1,0 +1,75 @@
+version: "3"
+services:
+ mysql:
+  build:
+   context: ./docker/mysql
+   args:
+    mysql_version: ${MYSQL_VERSION}
+  container_name: ${COMPOSE_PROJECT_NAME}-mysql
+  environment:
+    MYSQL_DATABASE: ${MYSQL_DATABASE}
+    MYSQL_USER: ${MYSQL_USER}
+    MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+  ports:
+    - "3306:3306"
+  volumes:
+    - "./schemas/:/var/lib/mysql"
+  restart: always  
+
+ php:
+  build:
+    context: ./docker/php
+    args:
+      php_version: ${PHP_VERSION}
+  container_name: ${COMPOSE_PROJECT_NAME}-php
+  ports:
+    - "${PHP_PORT}:8080"
+  volumes:
+    - /var/www/html/:/var/www/html/
+  links:
+    - mysql
+
+ poste:
+   image: analogic/poste.io
+   restart: always
+   network_mode: "host"
+   expose:
+     - 25
+     - 80
+     - 443
+     - 110
+     - 143
+     - 465
+     - 587
+     - 993
+     - 995
+   volumes:
+     - /var/mail/:/data
+   environment:
+     - HTTPS=ON
+     - DISABLE_CLAMAV=TRUE
+
+ app:
+  image: 'jc21/nginx-proxy-manager:latest'
+  ports:
+    - '81:81'
+  volumes:
+    - ./config.json:/app/config/production.json
+    - ./data:/data
+    - ./letsencrypt:/etc/letsencrypt
+
+ minio:
+  image: minio/minio
+  command: server /data
+  ports:
+   - 9000:9000
+  environment:
+   MINIO_ACCESS_KEY: AKIAIOSFODNN7EXAMPLE
+   MINIO_SECRET_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+   MINIO_DOMAIN: s3.ejemplo.com
+   VIRTUAL_HOST: s3.ejemplo.com
+   LETSENCRYPT_HOST: s3.ejemplo.com
+   LETSENCRYPT_EMAIL: pablo@ejemplo.com
+  volumes:
+   - ~/docker/minio-data:/data
